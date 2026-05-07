@@ -284,3 +284,59 @@ body {
   border-radius: var(--border-radius);
   transition: box-shadow 0.2s;
 }
+
+/* Main Menu Enhancements */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-radius: 50px;
+  width: 100%;
+}
+
+.main-logo {
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+.main-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font-size: 1.2rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.habit-driver {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 10px 20px;
+  border-radius: 30px;
+  margin-bottom: 32px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+  animation: pulse 3s infinite;
+  text-align: center;
+}

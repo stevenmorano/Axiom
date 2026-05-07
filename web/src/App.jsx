@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SYMBOLS, generateAxiomPuzzle, checkWin, getRuleDescription } from './axiomLogic';
+import { saveGameResult, loadStats } from './utils/statsStore';
+import StatsModal from './components/StatsModal';
 
 // --- Symbol Components ---
 const SymbolIcon = ({ type, size = 32 }) => {
@@ -56,6 +58,7 @@ function App() {
   const [timer, setTimer] = useState(0);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   // Drag State
   const [draggedSymbol, setDraggedSymbol] = useState(null);
@@ -153,6 +156,8 @@ function App() {
         } else {
             setStatus(DAILY_COMPLETE);
             clearInterval(timerRef.current);
+            saveGameResult(newTimes, mistakes);
+            setTimeout(() => setShowStats(true), 1500);
         }
     }, 300);
   };
@@ -181,15 +186,52 @@ function App() {
     }
   };
 
-  const shareResults = () => {
+  const shareResults = async () => {
     const total = times.reduce((a, b) => a + b, 0);
     const totalMistakes = mistakes.reduce((a, b) => a + b, 0);
     const flawless = totalMistakes === 0 ? ' 🌟 FLAWLESS' : '';
-    const grid = times.map((t, i) => `${getEmojiColor(t)} ${(t / 1000).toFixed(2)}`).join(' ');
+    
+    const lines = times.map((t, i) => {
+      const timeStr = formatTime(t).slice(0, 5); // MM:SS
+      const missCount = mistakes[i];
+      const missStr = missCount === 0 ? '🎯 Perfect' : `❌ ${missCount} ${missCount === 1 ? 'miss' : 'misses'}`;
+      return `${i+1}️⃣ ${getEmojiColor(t)} ${timeStr} | ${missStr}`;
+    }).join('\n');
+
     const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    const text = `Axiom #1 - ${dateStr}\nTotal: ${formatTime(total)}${flawless}\n${grid}`;
-    navigator.clipboard.writeText(text);
-    alert("Result Copied to Clipboard!");
+    
+    const stats = loadStats();
+    const streakStr = stats.stats.currentStreak > 1 ? `\n🔥 Streak: ${stats.stats.currentStreak}` : '';
+    
+    const shareText = `Axiom #1 - ${dateStr}\n⏱️ ${formatTime(total).slice(0, 5)}${flawless}${streakStr}\n\n${lines}\n\nPlay at: axiom.game`;
+    
+    // Always attempt to copy to clipboard behind the scenes just in case
+    try {
+      await navigator.clipboard.writeText(shareText);
+    } catch (e) {
+      console.warn("Silent copy failed", e);
+    }
+    
+    // Windows Desktop share sheet notoriously lacks a 'Copy' button.
+    // iOS and Android share sheets always have a 'Copy' button.
+    // So, we only trigger native share on mobile devices.
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (navigator.share && isMobile) {
+      try {
+        await navigator.share({
+          title: 'Axiom Daily Results',
+          text: shareText
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing:', err);
+        }
+      }
+    } else {
+      // Desktop fallback: just alert since we already copied it
+      alert("Result Copied to Clipboard!");
+    }
   };
 
   const resetGame = () => {
@@ -256,11 +298,43 @@ function App() {
 
   // --- Render Sections ---
   if (status === MAIN_SCREEN) {
+    const stats = loadStats();
+    
     return (
-      <div className="screen animate-fade-in" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <h1 className="game-title" style={{ fontSize: '4rem', marginBottom: '8px' }}>AXIOM</h1>
-        <p style={{ color: 'var(--text-dim)', marginBottom: '40px' }}>Daily Logic Sequence #01</p>
-        <button className="button-primary" onClick={startDaily}>PLAY TODAY</button>
+      <div className="screen animate-fade-in" style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Concept 1: Command Center Header */}
+        <div className="main-header glass">
+           <span className="main-logo">AXIOM</span>
+           <div className="main-actions">
+              <button className="icon-btn" title="How to Play">❓</button>
+              <button className="icon-btn" onClick={() => setShowStats(true)} title="Statistics">📊</button>
+           </div>
+        </div>
+
+        {/* Content Centered */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <h1 className="game-title" style={{ fontSize: '4rem', marginBottom: '8px' }}>AXIOM</h1>
+            <p style={{ color: 'var(--text-dim)', marginBottom: '32px' }}>Daily Logic Sequence #01</p>
+            
+            {/* Concept 2: Habit Driver */}
+            {stats.stats.gamesPlayed > 0 ? (
+                <div className="habit-driver">
+                    {stats.stats.currentStreak > 0 ? (
+                        <span>🔥 {stats.stats.currentStreak} Day Streak - Keep it going!</span>
+                    ) : (
+                        <span>Your logic is rusty. Start a new streak today.</span>
+                    )}
+                </div>
+            ) : (
+                <div className="habit-driver">
+                    <span>0 Games Played. Begin your journey.</span>
+                </div>
+            )}
+
+            <button className="button-primary" onClick={startDaily}>PLAY TODAY</button>
+        </div>
+        
+        <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
       </div>
     );
   }
@@ -388,7 +462,14 @@ function App() {
     
     return (
         <div className="screen animate-fade-in" style={{ overflowY: 'auto' }}>
-            <h1 className="game-title" style={{ textAlign: 'center', marginBottom: '8px' }}>DAILY COMPLETE</h1>
+            <button 
+              onClick={() => setShowStats(true)}
+              style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', zIndex: 100 }}
+              title="Statistics"
+            >
+              📊
+            </button>
+            <h1 className="game-title" style={{ textAlign: 'center', marginBottom: '8px', marginTop: '24px' }}>DAILY COMPLETE</h1>
             <p style={{ textAlign: 'center', color: 'var(--text-dim)', marginBottom: '32px' }}>
                 Axiom #1 - {new Date().toLocaleDateString()}
                 {totalMistakes === 0 && <span style={{ color: 'var(--success)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>🌟 FLAWLESS RUN</span>}
@@ -400,23 +481,21 @@ function App() {
                     <span className="timer" style={{ fontSize: '1.8rem' }}>{formatTime(totalTime)}</span>
                 </div>
                 
-                <table className="final-results-table">
-                    <tbody>
-                        {times.map((t, i) => (
-                            <tr key={i}>
-                                <td style={{ padding: '4px 0' }}>Puzzle {i+1}</td>
-                                <td style={{ padding: '4px 0', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-                                    {mistakes[i]} mistakes
-                                </td>
-                                <td style={{ padding: '4px 0', textAlign: 'right' }}>
-                                    <span className={getEmojiColor(t) === '🟩' ? 'tag-green' : getEmojiColor(t) === '🟨' ? 'tag-yellow' : 'tag-red'}>
-                                        {formatTime(t)}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {times.map((t, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-dim)' }}>{i+1}</span>
+                                <div style={{ fontSize: '0.9rem', color: mistakes[i] === 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
+                                    {mistakes[i] === 0 ? '🎯 Perfect' : `❌ ${mistakes[i]} ${mistakes[i] === 1 ? 'miss' : 'misses'}`}
+                                </div>
+                            </div>
+                            <span className={getEmojiColor(t) === '🟩' ? 'tag-green' : getEmojiColor(t) === '🟨' ? 'tag-yellow' : 'tag-red'} style={{ fontWeight: '600' }}>
+                                {formatTime(t)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <h3 style={{ marginBottom: '12px' }}>Global Leaderboard</h3>
@@ -447,6 +526,7 @@ function App() {
             >
                 Start Over
             </button>
+            <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
         </div>
     );
   }

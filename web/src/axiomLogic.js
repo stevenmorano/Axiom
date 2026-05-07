@@ -66,7 +66,7 @@ function generateValidRules(board) {
   const rules = [];
   SYMBOLS.forEach(primary => {
     const primaryIndex = board.indexOf(primary);
-    
+
     // Absolute rule
     rules.push({ primary, type: RULE_TYPES.isInSlot, slot: primaryIndex });
 
@@ -98,7 +98,7 @@ function generateValidRules(board) {
 
 function generateAxiomPuzzle(ruleCount) {
   const allBoards = generatePermutations(SYMBOLS);
-  
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const targetBoard = allBoards[Math.floor(Math.random() * allBoards.length)];
     let allTrueRules = generateValidRules(targetBoard);
@@ -118,38 +118,38 @@ function generateAxiomPuzzle(ruleCount) {
         if (subset.every(rule => evaluateRule(rule, testBoard))) {
           validBoardsCount++;
         }
-        if (validBoardsCount > 1) break; 
+        if (validBoardsCount > 1) break;
       }
 
       if (validBoardsCount === 1) {
-        return { 
-          solution: targetBoard, 
-          rules: subset 
+        return {
+          solution: targetBoard,
+          rules: subset
         };
       }
     }
   }
-  
+
   // Last ditch effort: Just return one with 4 rules if 3 failed
   if (ruleCount < 4) return generateAxiomPuzzle(ruleCount + 1);
-  
+
   return null;
 }
 
 function getRuleDescription(rule) {
-    const p = rule.primary.charAt(0).toUpperCase() + rule.primary.slice(1);
-    const s = rule.secondary ? rule.secondary.charAt(0).toUpperCase() + rule.secondary.slice(1) : '';
-    
-    switch (rule.type) {
-        case RULE_TYPES.isImmediatelyLeftOf: return `${p} is immediately left of ${s}`;
-        case RULE_TYPES.isImmediatelyRightOf: return `${p} is immediately right of ${s}`;
-        case RULE_TYPES.isSomewhereLeftOf: return `${p} is somewhere left of ${s}`;
-        case RULE_TYPES.isSomewhereRightOf: return `${p} is somewhere right of ${s}`;
-        case RULE_TYPES.isNextTo: return `${p} is next to ${s}`;
-        case RULE_TYPES.isNotNextTo: return `${p} is NOT next to ${s}`;
-        case RULE_TYPES.isInSlot: return `${p} is exactly in slot ${rule.slot + 1}`;
-        default: return "Unknown rule";
-    }
+  const p = rule.primary.charAt(0).toUpperCase() + rule.primary.slice(1);
+  const s = rule.secondary ? rule.secondary.charAt(0).toUpperCase() + rule.secondary.slice(1) : '';
+
+  switch (rule.type) {
+    case RULE_TYPES.isImmediatelyLeftOf: return `${p} is immediately left of ${s}`;
+    case RULE_TYPES.isImmediatelyRightOf: return `${p} is immediately right of ${s}`;
+    case RULE_TYPES.isSomewhereLeftOf: return `${p} is somewhere left of ${s}`;
+    case RULE_TYPES.isSomewhereRightOf: return `${p} is somewhere right of ${s}`;
+    case RULE_TYPES.isNextTo: return `${p} is next to ${s}`;
+    case RULE_TYPES.isNotNextTo: return `${p} is NOT next to ${s}`;
+    case RULE_TYPES.isInSlot: return `${p} is exactly in slot ${rule.slot + 1}`;
+    default: return "Unknown rule";
+  }
 }
 
 export { SYMBOLS, generateAxiomPuzzle, checkWin, getRuleDescription };
