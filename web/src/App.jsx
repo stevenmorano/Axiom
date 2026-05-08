@@ -1,31 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SYMBOLS, generateAxiomPuzzle, checkWin, getRuleDescription } from './axiomLogic';
-import { saveGameResult, loadStats } from './utils/statsStore';
+import { saveGameResult, saveGameFailure, loadStats } from './utils/statsStore';
 import StatsModal from './components/StatsModal';
-
-// --- Symbol Components ---
-const SymbolIcon = ({ type, size = 32 }) => {
-  const colors = {
-    circle: '#38bdf8',
-    triangle: '#fb923c',
-    square: '#a78bfa',
-    star: '#facc15',
-    hexagon: '#2dd4bf',
-  };
-
-  const color = colors[type];
-
-  return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="symbol-svg">
-      {type === 'circle' && <circle cx="50" cy="50" r="40" stroke={color} strokeWidth="8" fill="none" />}
-      {type === 'triangle' && <path d="M50 15 L15 85 L85 85 Z" stroke={color} strokeWidth="8" strokeLinejoin="round" fill="none" />}
-      {type === 'square' && <rect x="15" y="15" width="70" height="70" rx="8" stroke={color} strokeWidth="8" fill="none" />}
-      {type === 'star' && <path d="M50 5 L61 39 L97 39 L68 60 L79 94 L50 73 L21 94 L32 60 L3 39 L39 39 Z" stroke={color} strokeWidth="8" strokeLinejoin="round" fill="none" />}
-      {type === 'hexagon' && <path d="M50 10 L85 30 L85 70 L50 90 L15 70 L15 30 Z" stroke={color} strokeWidth="8" strokeLinejoin="round" fill="none" />}
-    </svg>
-  );
-};
+import RulesModal from './components/RulesModal';
+import { SymbolIcon } from './components/SymbolIcon';
 
 // --- Helper Functions ---
 const formatTime = (ms) => {
@@ -47,6 +26,7 @@ const PRE_PUZZLE = 'pre_puzzle';
 const PLAYING = 'playing';
 const PUZZLE_COMPLETE = 'puzzle_complete';
 const DAILY_COMPLETE = 'daily_complete';
+const SYSTEM_FAILURE = 'system_failure';
 
 function App() {
   const [status, setStatus] = useState(MAIN_SCREEN);
@@ -55,10 +35,12 @@ function App() {
   const [puzzle, setPuzzle] = useState(null);
   const [times, setTimes] = useState([null, null, null, null, null]);
   const [mistakes, setMistakes] = useState([0, 0, 0, 0, 0]);
+  const [lives, setLives] = useState(10);
   const [timer, setTimer] = useState(0);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   // Drag State
   const [draggedSymbol, setDraggedSymbol] = useState(null);
@@ -68,6 +50,13 @@ function App() {
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(0);
+  const lastInteractionRef = useRef(Date.now());
+
+  const handleSystemFailure = () => {
+    setStatus(SYSTEM_FAILURE);
+    if (timerRef.current) clearInterval(timerRef.current);
+    saveGameFailure(timer);
+  };
 
   // --- State Persistence ---
   useEffect(() => {
@@ -81,11 +70,18 @@ function App() {
         setPuzzle(state.puzzle);
         setTimes(state.times);
         setMistakes(state.mistakes || [0,0,0,0,0]);
+        setLives(state.lives !== undefined ? state.lives : 10);
         startTimeRef.current = state.startTime || Date.now();
+        lastInteractionRef.current = state.lastInteraction || Date.now();
         
         if (state.status === PLAYING) {
           timerRef.current = setInterval(() => {
-            setTimer(Date.now() - startTimeRef.current);
+            const now = Date.now();
+            setTimer(now - startTimeRef.current);
+            // 15 minutes = 900000 ms
+            if (now - lastInteractionRef.current > 900000) {
+                handleSystemFailure();
+            }
           }, 47);
         }
       } catch (e) {
@@ -99,10 +95,11 @@ function App() {
   useEffect(() => {
     if (status !== MAIN_SCREEN) {
       localStorage.setItem('axiom_state', JSON.stringify({
-        status, currentIdx, board, puzzle, times, mistakes, startTime: startTimeRef.current
+        status, currentIdx, board, puzzle, times, mistakes, lives,
+        lastInteraction: lastInteractionRef.current, startTime: startTimeRef.current
       }));
     }
-  }, [status, currentIdx, board, puzzle, times, mistakes]);
+  }, [status, currentIdx, board, puzzle, times, mistakes, lives]);
 
   // --- Game Loop Handlers ---
   const startDaily = () => {
@@ -110,6 +107,8 @@ function App() {
     setCurrentIdx(0);
     setTimes([null, null, null, null, null]);
     setMistakes([0, 0, 0, 0, 0]);
+    setLives(10);
+    lastInteractionRef.current = Date.now();
     preparePuzzle(0);
   };
 
@@ -127,9 +126,12 @@ function App() {
       setStatus(PLAYING);
       setTimer(0);
       startTimeRef.current = Date.now();
+      lastInteractionRef.current = Date.now();
       clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
-        setTimer(Date.now() - startTimeRef.current);
+        const now = Date.now();
+        setTimer(now - startTimeRef.current);
+        if (now - lastInteractionRef.current > 900000) handleSystemFailure();
       }, 47);
     }
   };
@@ -137,9 +139,12 @@ function App() {
   const startPuzzle = () => {
     setStatus(PLAYING);
     startTimeRef.current = Date.now();
+    lastInteractionRef.current = Date.now();
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setTimer(Date.now() - startTimeRef.current);
+      const now = Date.now();
+      setTimer(now - startTimeRef.current);
+      if (now - lastInteractionRef.current > 900000) handleSystemFailure();
     }, 47);
   };
 
@@ -156,7 +161,7 @@ function App() {
         } else {
             setStatus(DAILY_COMPLETE);
             clearInterval(timerRef.current);
-            saveGameResult(newTimes, mistakes);
+            saveGameResult(newTimes, lives);
             setTimeout(() => setShowStats(true), 1500);
         }
     }, 300);
@@ -164,6 +169,8 @@ function App() {
 
   const handleSubmit = () => {
     if (board.includes(null)) return;
+    
+    lastInteractionRef.current = Date.now();
     
     if (checkWin(board, puzzle.rules)) {
         handleWin(Date.now() - startTimeRef.current);
@@ -174,6 +181,13 @@ function App() {
         const newMistakes = [...mistakes];
         newMistakes[currentIdx]++;
         setMistakes(newMistakes);
+        
+        const newLives = lives - 1;
+        setLives(newLives);
+        
+        if (newLives <= 0) {
+            handleSystemFailure();
+        }
     }
   };
 
@@ -241,12 +255,14 @@ function App() {
     setBoard([null, null, null, null, null]);
     setMistakes([0, 0, 0, 0, 0]);
     setTimes([null, null, null, null, null]);
+    setLives(10);
     setTimer(0);
   };
 
   // --- Interaction Logic ---
   const onPointerDown = (e, symbol, fromSlot = -1) => {
     e.preventDefault();
+    lastInteractionRef.current = Date.now();
     setDraggedSymbol(symbol);
     const rect = e.currentTarget.getBoundingClientRect();
     setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
@@ -306,7 +322,7 @@ function App() {
         <div className="main-header glass">
            <span className="main-logo">AXIOM</span>
            <div className="main-actions">
-              <button className="icon-btn" title="How to Play">❓</button>
+              <button className="icon-btn" onClick={() => setShowRules(true)} title="How to Play">❓</button>
               <button className="icon-btn" onClick={() => setShowStats(true)} title="Statistics">📊</button>
            </div>
         </div>
@@ -335,6 +351,7 @@ function App() {
         </div>
         
         <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
+        <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
       </div>
     );
   }
@@ -374,9 +391,18 @@ function App() {
     
     return (
       <div className={`screen ${isSuccess ? 'success-overlay' : ''}`}>
-        <div className="header">
+        <div className="header" style={{ marginBottom: '12px' }}>
           <span className="game-title">AXIOM {currentIdx + 1}/5</span>
           <span className="timer">{formatTime(timer)}</span>
+        </div>
+
+        <div className="integrity-container">
+            <div className="integrity-label">INTEGRITY</div>
+            <div className="integrity-bar">
+               {[...Array(10)].map((_, i) => (
+                   <div key={i} className={`integrity-segment ${i < lives ? (lives <= 3 ? 'critical' : 'active') : 'drained'}`}></div>
+               ))}
+            </div>
         </div>
 
         <div className="rules-container glass">
@@ -461,74 +487,112 @@ function App() {
     const totalMistakes = mistakes.reduce((a, b) => a + b, 0);
     
     return (
-        <div className="screen animate-fade-in" style={{ overflowY: 'auto' }}>
-            <button 
-              onClick={() => setShowStats(true)}
-              style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', zIndex: 100 }}
-              title="Statistics"
-            >
-              📊
-            </button>
-            <h1 className="game-title" style={{ textAlign: 'center', marginBottom: '8px', marginTop: '24px' }}>DAILY COMPLETE</h1>
-            <p style={{ textAlign: 'center', color: 'var(--text-dim)', marginBottom: '32px' }}>
-                Axiom #1 - {new Date().toLocaleDateString()}
-                {totalMistakes === 0 && <span style={{ color: 'var(--success)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>🌟 FLAWLESS RUN</span>}
-            </p>
+        <div className="screen animate-fade-in daily-complete-screen" style={{ padding: 0 }}>
+            {/* Scrollable Content */}
+            <div className="daily-complete-content">
+                <button 
+                  onClick={() => setShowStats(true)}
+                  style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', zIndex: 100 }}
+                  title="Statistics"
+                >
+                  📊
+                </button>
+                <h1 className="game-title title-margin">DAILY COMPLETE</h1>
+                <p className="subtitle-margin" style={{ textAlign: 'center', color: 'var(--text-dim)' }}>
+                    Axiom #1 - {new Date().toLocaleDateString()}
+                    {totalMistakes === 0 && <span style={{ color: 'var(--success)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>🌟 FLAWLESS RUN</span>}
+                </p>
 
-            <div className="glass" style={{ padding: '24px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <span>Total Time</span>
-                    <span className="timer" style={{ fontSize: '1.8rem' }}>{formatTime(totalTime)}</span>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {times.map((t, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-dim)' }}>{i+1}</span>
-                                <div style={{ fontSize: '0.9rem', color: mistakes[i] === 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
-                                    {mistakes[i] === 0 ? '🎯 Perfect' : `❌ ${mistakes[i]} ${mistakes[i] === 1 ? 'miss' : 'misses'}`}
+                <div className="glass daily-stats-glass">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <span>Total Time</span>
+                        <span className="timer" style={{ fontSize: '1.8rem' }}>{formatTime(totalTime)}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {times.map((t, i) => (
+                            <div key={i} className="stat-row">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-dim)' }}>{i+1}</span>
+                                    <div style={{ fontSize: '0.9rem', color: mistakes[i] === 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '500' }}>
+                                        {mistakes[i] === 0 ? '🎯 Perfect' : `❌ ${mistakes[i]} ${mistakes[i] === 1 ? 'miss' : 'misses'}`}
+                                    </div>
                                 </div>
+                                <span className={getEmojiColor(t) === '🟩' ? 'tag-green' : getEmojiColor(t) === '🟨' ? 'tag-yellow' : 'tag-red'} style={{ fontWeight: '600' }}>
+                                    {formatTime(t)}
+                                </span>
                             </div>
-                            <span className={getEmojiColor(t) === '🟩' ? 'tag-green' : getEmojiColor(t) === '🟨' ? 'tag-yellow' : 'tag-red'} style={{ fontWeight: '600' }}>
-                                {formatTime(t)}
-                            </span>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+                </div>
+
+                <h3 style={{ marginBottom: '12px' }}>Global Leaderboard</h3>
+
+                <div className="leaderboard-item">
+                    <span>1. ZenMaster</span>
+                    <span>00:48.12</span>
+                </div>
+                <div className="leaderboard-item me">
+                    <span>{Math.floor(Math.random() * 50) + 12}. YOU</span>
+                    <span>{formatTime(totalTime)}</span>
+                </div>
+                <div className="leaderboard-item" style={{ marginBottom: '0' }}>
+                    <span>Avg Player</span>
+                    <span>01:15.44</span>
                 </div>
             </div>
 
-            <h3 style={{ marginBottom: '12px' }}>Global Leaderboard</h3>
-
-            <div className="leaderboard-item">
-                <span>1. ZenMaster</span>
-                <span>00:48.12</span>
+            {/* Sticky Footer */}
+            <div className="daily-complete-footer glass">
+                <button 
+                    className="button-primary share-btn" 
+                    onClick={shareResults}
+                >
+                    SHARE RESULTS
+                </button>
+                <button 
+                    onClick={resetGame}
+                    className="start-over-btn"
+                >
+                    Start Over
+                </button>
             </div>
-            <div className="leaderboard-item me">
-                <span>{Math.floor(Math.random() * 50) + 12}. YOU</span>
-                <span>{formatTime(totalTime)}</span>
-            </div>
-            <div className="leaderboard-item">
-                <span>Avg Player</span>
-                <span>01:15.44</span>
-            </div>
-
-            <button 
-                className="button-primary" 
-                style={{ marginTop: 'auto', background: 'var(--text)', color: 'var(--bg-color)' }}
-                onClick={shareResults}
-            >
-                SHARE RESULTS
-            </button>
-            <button 
-                onClick={resetGame}
-                style={{ marginTop: '16px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}
-            >
-                Start Over
-            </button>
+            
             <StatsModal isOpen={showStats} onClose={() => setShowStats(false)} />
         </div>
     );
+  }
+
+  if (status === SYSTEM_FAILURE) {
+      return (
+          <div className="screen animate-fade-in" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+              <div className="glitch-overlay"></div>
+              <div className="glass" style={{ padding: '40px 24px', width: '100%', border: '1px solid rgba(239, 68, 68, 0.3)', position: 'relative', zIndex: 10 }}>
+                  <h1 className="game-title glitch-text" data-text="SYSTEM FAILURE" style={{ color: 'var(--danger)', fontSize: '2.5rem', letterSpacing: '2px', marginBottom: '8px' }}>
+                     SYSTEM FAILURE
+                  </h1>
+                  <p style={{ color: 'var(--text-dim)', marginBottom: '32px', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                    &gt; INTEGRITY COMPROMISED<br/>
+                    &gt; CONNECTION TERMINATED
+                  </p>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', textAlign: 'left', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                      <div style={{ color: 'var(--text-dim)' }}>
+                         PUZZLES SOLVED:<br/>
+                         TIME ELAPSED:
+                      </div>
+                      <div style={{ color: 'var(--text)', textAlign: 'right' }}>
+                         {currentIdx}/5<br/>
+                         {formatTime(timer)}
+                      </div>
+                  </div>
+
+                  <button className="button-primary" onClick={resetGame} style={{ background: 'transparent', border: '2px solid var(--danger)', color: 'var(--danger)', width: '100%' }}>
+                     REBOOT SYSTEM
+                  </button>
+              </div>
+          </div>
+      );
   }
 
   return null;

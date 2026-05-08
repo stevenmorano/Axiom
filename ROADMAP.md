@@ -9,8 +9,9 @@ This document outlines the strategic plan for Axiom, breaking down development f
 
 - [x] **Sequence & Validation Engine:** Engine (`axiomLogic.js`) capable of generating absolute and relative positional rules for 5 shapes across 5 slots.
 - [x] **Drag & Drop UI:** Implemented custom pointer-event drag and drop for placing shapes into slots.
-- [x] **Core Game Loop:** 5 back-to-back puzzles with increasing rule counts (3 to 5 rules). Mistakes track errors and cost time rather than ending the run.
+- [x] **Core Game Loop:** 5 back-to-back puzzles with increasing rule counts. Features a 10-strike Integrity Bar and a 15-minute AFK connection timeout that trigger a "SYSTEM FAILURE" state.
 - [x] **Local Persistence:** Saving active puzzle splits, rules, and completion states to `localStorage` to survive browser refreshes.
+- [x] **Rules & Onboarding:** Glassmorphic "How to Play" modal with inline symbols explaining mechanics and logic rules.
 - [x] **Results Screen & Sharing:** Generation of a final results card with time splits, mistake counts, and clipboard copying for social sharing.
 
 ---
@@ -33,7 +34,7 @@ This document outlines the strategic plan for Axiom, breaking down development f
 - [ ] **In-App Purchases (IAP):** 
   - Premium tier to permanently remove ads.
   - Cosmetic marketplace for exclusive "Neon Themes" and alternative shape icons.
-- [x] **Player Statistics Dashboard:** Track lifetime metrics, average solve times, and current/longest daily streaks.
+- [x] **Player Statistics Dashboard:** Gamified tracking of Win %, Streaks, and an algorithmic Axiom Rating (0-1000) based on speed and accuracy. Features a personalized distribution chart and 3-state heatmap.
 - [ ] **Achievement System:** Unlockable badges for specific milestones (e.g., "Flawless Run" for zero mistakes on a daily challenge).
 
 ---
@@ -55,4 +56,3 @@ This document outlines the strategic plan for Axiom, breaking down development f
 *These items have been noted for future sessions:*
 
 - **Mobile Safari UI Bug:** On iPhone Safari, the bottom navigation bar covers up the "Next" button while playing. We will likely need to adjust the viewport height (e.g., using `100dvh` instead of `100vh` or adding bottom padding) so the browser's dynamic UI doesn't obstruct critical game elements.
-- **Stats Dashboard Rework:** The current win rate statistic is too vague, as most players will eventually solve the puzzle given enough time. The stats focus needs to shift toward "flawless" execution and time taken. Errors or misses should negatively impact the displayed stats, factoring in both precision and completion speed rather than just a flat win rate.

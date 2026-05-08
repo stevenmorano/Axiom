@@ -33,13 +33,16 @@ The app progresses linearly through distinct phases:
 *   `PLAYING` (`'playing'`): Active puzzle solving. Timer is running.
 *   `PUZZLE_COMPLETE` (`'puzzle_complete'`): Brief 300ms transition state after a correct submission before loading the next round.
 *   `DAILY_COMPLETE` (`'daily_complete'`): Final results screen with split times, mistakes, and clipboard sharing.
+*   `SYSTEM_FAILURE` (`'system_failure'`): Triggered if the player loses all lives or times out.
 
 ### 3.2 Game State Variables
 *   `currentIdx`: Tracks the active puzzle round (0 to 4).
 *   `board`: An array of length 5 representing the current slots. Empty slots are `null`.
 *   `puzzle`: An object containing the active `rules` and the `solution`.
 *   `times` / `mistakes`: Arrays of length 5 tracking the milliseconds and error counts per round.
-*   `timer`: Active millisecond count (updated every 47ms via `setInterval` for visual smoothness without blocking the main thread).
+*   `lives`: Tracks remaining integrity (starts at 10, -1 per mistake).
+*   `timer`: Active millisecond count (updated every 47ms via `setInterval` for visual smoothness).
+*   `lastInteraction`: Tracks the exact timestamp of the last touch/drag to power a 15-minute AFK connection timeout.
 
 ### 3.3 Persistence Layer
 A strict `useEffect` hook monitors the game state. Any change to `status`, `board`, or `times` triggers a serialization of the state to `localStorage.getItem('axiom_state')`. 
@@ -66,6 +69,7 @@ It utilizes a custom Pointer Events implementation:
 
 Axiom includes a built-in gamification engine to drive retention without relying on external servers. 
 
-*   **`saveGameResult(times, mistakes)`**: Invoked immediately when the player completes the 5th puzzle. It calculates the total time and perfect run status.
-*   **Streak Logic**: The engine checks the last played date. If it was exactly yesterday, it increments the current streak. If the difference is > 1 day, it resets the streak to 1.
-*   **Historical Dictionary**: Performance is stored in a `history` dictionary keyed by `YYYY-MM-DD`. This powers the 30-day visual Calendar Heatmap in the UI, allowing players to visually track their consistency and flawless days.
+*   **`calculateAxiomRating(time, lives)`**: Generates a 0-1000 score. Base is 1000, minus 50 points per lost life, and minus 2 points per elapsed second.
+*   **`saveGameResult(times, livesRemaining)`**: Invoked immediately when the player completes the 5th puzzle. Updates win counts, calculates the rating, and manages streaks.
+*   **`saveGameFailure(timeMs)`**: Invoked when the `SYSTEM_FAILURE` state is triggered. Resets the current streak to 0 and logs a failure status for the day.
+*   **Historical Dictionary**: Performance is stored in a `history` dictionary keyed by `YYYY-MM-DD`. This powers the 30-day visual Calendar Heatmap in the UI (showing Red/Yellow/Green states), and the dynamic Rating Distribution bar chart.

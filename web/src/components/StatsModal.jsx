@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { loadStats } from '../utils/statsStore';
+import { loadStats, getRatingDistribution } from '../utils/statsStore';
 import './StatsModal.css';
 
 const StatsModal = ({ isOpen, onClose }) => {
@@ -19,11 +19,13 @@ const StatsModal = ({ isOpen, onClose }) => {
   if (!isOpen || !statsData) return null;
 
   const { stats, history } = statsData;
-  const winPercent = stats.gamesPlayed > 0 ? 100 : 0; // Win rate is 100% since we only log wins
+  const winPercent = stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0;
+  const avgRating = stats.wins > 0 ? Math.round(stats.totalRating / stats.wins) : 0;
 
-  // Mock distribution curve data for MVP
-  const distribution = [5, 12, 28, 45, 80, 55, 25, 10, 4];
-  const userTierIndex = 4; // Mock user falling in the median
+  const distObj = getRatingDistribution();
+  const distLabels = ['<600', '600-699', '700-799', '800-899', '900+'];
+  const distData = distLabels.map(k => distObj[k]);
+  const maxVal = Math.max(...distData, 1);
 
   // Generate last 30 days for heatmap
   const heatmapDays = [];
@@ -64,29 +66,32 @@ const StatsModal = ({ isOpen, onClose }) => {
             <div className="stat-label">Streak</div>
           </div>
           <div className="stat-box">
-            <div className="stat-value">{stats.maxStreak}</div>
-            <div className="stat-label">Max</div>
+            <div className="stat-value">{avgRating}</div>
+            <div className="stat-label">Avg Rating</div>
           </div>
         </div>
 
-        {/* Global Distribution */}
+        {/* Rating Distribution */}
         <div className="stats-section">
-          <h3>GLOBAL DISTRIBUTION</h3>
+          <h3>RATING DISTRIBUTION</h3>
           <div className="distribution-chart">
-            {distribution.map((val, idx) => (
-              <div key={idx} className="dist-bar-container">
-                <div 
-                  className={`dist-bar ${idx === userTierIndex ? 'dist-bar-active' : ''}`}
-                  style={{ height: showAnimation ? `${(val / 80) * 100}%` : '0%' }}
-                ></div>
-              </div>
-            ))}
+            {distLabels.map((label, idx) => {
+              const val = distData[idx];
+              const isMostFrequent = val === Math.max(...distData) && val > 0;
+              return (
+                <div key={idx} className="dist-bar-container">
+                  <div className="dist-bar-wrapper">
+                    <div 
+                      className={`dist-bar ${isMostFrequent ? 'dist-bar-active' : ''}`}
+                      style={{ height: showAnimation ? `${(val / maxVal) * 100}%` : '0%' }}
+                    ></div>
+                  </div>
+                  <div className="dist-bar-value">{val}</div>
+                  <div className="dist-bar-label">{label}</div>
+                </div>
+              );
+            })}
           </div>
-          {stats.gamesPlayed > 0 && (
-            <div className="percentile-text">
-              You beat <span className="highlight-text">82%</span> of players today.
-            </div>
-          )}
         </div>
 
         {/* Calendar Heatmap */}
@@ -96,7 +101,8 @@ const StatsModal = ({ isOpen, onClose }) => {
             {heatmapDays.map((day, i) => {
               let cellClass = 'heatmap-cell empty';
               if (day.record) {
-                if (day.record.mistakes === 0) cellClass = 'heatmap-cell flawless';
+                if (day.record.status === 'fail') cellClass = 'heatmap-cell failed';
+                else if (day.record.lives === 10) cellClass = 'heatmap-cell flawless';
                 else cellClass = 'heatmap-cell finished';
               }
               return <div key={i} className={cellClass} title={day.dateStr}></div>;
