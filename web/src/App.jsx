@@ -217,7 +217,7 @@ function App() {
     const stats = loadStats();
     const streakStr = stats.stats.currentStreak > 1 ? `\n🔥 Streak: ${stats.stats.currentStreak}` : '';
     
-    const shareText = `Axiom #1 - ${dateStr}\n⏱️ ${formatTime(total).slice(0, 5)}${flawless}${streakStr}\n\n${lines}\n\nPlay at: axiom.game`;
+    const shareText = `Axiom #1 - ${dateStr}\n⏱️ ${formatTime(total).slice(0, 5)}${flawless}${streakStr}\n\n${lines}\n\nPlay at: https://axiom-v8sl.vercel.app/`;
     
     // Always attempt to copy to clipboard behind the scenes just in case
     try {

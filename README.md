@@ -1,5 +1,7 @@
 # Axiom
 
+**Live Demo:** [https://axiom-v8sl.vercel.app/](https://axiom-v8sl.vercel.app/)
+
 **Axiom** is a high-performance, daily-challenge logic sequence puzzle. Players race against the clock to arrange 5 distinct shapes into the correct order across 5 slots, guided by a set of strict positional rules.
 
 Built with competitive integrity and daily retention in mind, Axiom features a 5-round back-to-back speedrun where mistakes cost you seconds, not your entire run.
