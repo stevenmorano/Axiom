@@ -48,3 +48,11 @@ This document outlines the strategic plan for Axiom, breaking down development f
 ---
 
 *This roadmap is a living document and will be updated as project priorities evolve based on user feedback and technical requirements.*
+
+---
+
+## 📌 Known Issues & Backlog (To Fix Later)
+*These items have been noted for future sessions:*
+
+- **Mobile Safari UI Bug:** On iPhone Safari, the bottom navigation bar covers up the "Next" button while playing. We will likely need to adjust the viewport height (e.g., using `100dvh` instead of `100vh` or adding bottom padding) so the browser's dynamic UI doesn't obstruct critical game elements.
+- **Stats Dashboard Rework:** The current win rate statistic is too vague, as most players will eventually solve the puzzle given enough time. The stats focus needs to shift toward "flawless" execution and time taken. Errors or misses should negatively impact the displayed stats, factoring in both precision and completion speed rather than just a flat win rate.
